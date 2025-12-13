@@ -82,7 +82,7 @@ class TestContainerConfigValidation:
 
     def test_empty_image_rejected(self):
         """Test that empty image name is rejected."""
-        with pytest.raises(ValueError, match="image cannot be empty"):
+        with pytest.raises(ValueError, match="Docker image name cannot be empty"):
             ContainerConfig(image="", command=["python"])
 
     def test_timeout_too_low_rejected(self):

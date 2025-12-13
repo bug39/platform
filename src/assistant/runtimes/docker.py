@@ -15,6 +15,11 @@ except ImportError:
     DOCKER_AVAILABLE = False
 
 from .base import ExecutionResult, Runtime, RuntimeConfig
+from ..utils.validation import (
+    validate_docker_image_name,
+    validate_dockerfile_path,
+    validate_build_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +40,8 @@ class ContainerConfig:
         """Validate configuration values."""
         import re
 
-        # Validate image name
-        if not self.image or not self.image.strip():
-            raise ValueError("image cannot be empty")
+        # Validate image name using validation helper
+        validate_docker_image_name(self.image)
 
         # Validate timeout range
         if not (1 <= self.timeout_seconds <= 300):
@@ -119,6 +123,13 @@ class DockerManager:
         Returns:
             True if image is ready, False otherwise
         """
+        # Validate image name for security
+        try:
+            validate_docker_image_name(image_name)
+        except ValueError as e:
+            logger.error(f"Invalid image name: {e}")
+            return False
+
         # Check cache first
         if not force_rebuild and image_name in self._image_cache:
             return True
@@ -132,6 +143,14 @@ class DockerManager:
         except ImageNotFound:
             if not dockerfile_path:
                 logger.error(f"Image {image_name} not found and no Dockerfile provided")
+                return False
+
+            # Validate paths for security
+            try:
+                validate_build_context(build_context)
+                validate_dockerfile_path(dockerfile_path, build_context)
+            except ValueError as e:
+                logger.error(f"Invalid path: {e}")
                 return False
 
             # Build the image

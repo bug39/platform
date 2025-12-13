@@ -1,5 +1,7 @@
 """Validation utilities for input validation and sanitization."""
 
+import re
+from pathlib import Path
 from typing import Optional, Tuple
 from ..providers import get_provider
 from ..providers.base import Message
@@ -172,3 +174,133 @@ def sanitize_error_message(error: Exception, show_details: bool = False) -> str:
     else:
         # In production, just show the sanitized message
         return base_message
+
+
+def validate_docker_image_name(image_name: str) -> None:
+    """
+    Validate Docker image name contains only safe characters.
+
+    Args:
+        image_name: Docker image name to validate
+
+    Raises:
+        ValueError: If image name contains unsafe characters
+
+    Example:
+        >>> validate_docker_image_name("python:3.12")  # OK
+        >>> validate_docker_image_name("user/repo:tag")  # OK
+        >>> validate_docker_image_name("../../../etc/passwd")  # Raises ValueError
+    """
+    if not image_name or not image_name.strip():
+        raise ValueError("Docker image name cannot be empty")
+
+    # Allow alphanumeric, :, /, -, _, and .
+    # This matches Docker's official image name format
+    if not re.match(r'^[a-zA-Z0-9:/_.-]+$', image_name):
+        raise ValueError(
+            f"Invalid Docker image name: '{image_name}'. "
+            "Only alphanumeric characters and :/_.- are allowed"
+        )
+
+    # Additional check: prevent path traversal attempts
+    if ".." in image_name:
+        raise ValueError(
+            f"Invalid Docker image name: '{image_name}'. "
+            "Path traversal sequences (..) are not allowed"
+        )
+
+
+def validate_dockerfile_path(dockerfile_path: str, build_context: str = ".") -> Path:
+    """
+    Validate and sanitize Dockerfile path to prevent path traversal.
+
+    Args:
+        dockerfile_path: Path to Dockerfile (relative to build_context)
+        build_context: Build context directory
+
+    Returns:
+        Sanitized Path object
+
+    Raises:
+        ValueError: If path contains path traversal or is unsafe
+
+    Example:
+        >>> validate_dockerfile_path("Dockerfile.python", "docker")
+        >>> validate_dockerfile_path("../../../etc/passwd", "docker")  # Raises
+    """
+    if not dockerfile_path or not dockerfile_path.strip():
+        raise ValueError("Dockerfile path cannot be empty")
+
+    # Check for path traversal attempts
+    if ".." in dockerfile_path:
+        raise ValueError(
+            f"Invalid Dockerfile path: '{dockerfile_path}'. "
+            "Path traversal sequences (..) are not allowed"
+        )
+
+    # Check for absolute paths (should be relative to build context)
+    if Path(dockerfile_path).is_absolute():
+        raise ValueError(
+            f"Invalid Dockerfile path: '{dockerfile_path}'. "
+            "Path must be relative to build context"
+        )
+
+    # Resolve the full path and ensure it's within build context
+    try:
+        context_path = Path(build_context).resolve()
+        full_path = (context_path / dockerfile_path).resolve()
+
+        # Ensure the resolved path is within the build context
+        if not str(full_path).startswith(str(context_path)):
+            raise ValueError(
+                f"Invalid Dockerfile path: '{dockerfile_path}'. "
+                "Path must be within build context"
+            )
+
+        return full_path
+
+    except Exception as e:
+        raise ValueError(f"Invalid Dockerfile path: {e}")
+
+
+def validate_build_context(build_context: str) -> Path:
+    """
+    Validate build context is a valid directory.
+
+    Args:
+        build_context: Path to build context directory
+
+    Returns:
+        Validated Path object
+
+    Raises:
+        ValueError: If path is invalid or doesn't exist
+
+    Example:
+        >>> validate_build_context("docker")
+        >>> validate_build_context("/nonexistent")  # Raises
+    """
+    if not build_context or not build_context.strip():
+        raise ValueError("Build context cannot be empty")
+
+    try:
+        context_path = Path(build_context).resolve()
+
+        # Check if path exists
+        if not context_path.exists():
+            raise ValueError(
+                f"Build context does not exist: '{build_context}'"
+            )
+
+        # Check if it's a directory
+        if not context_path.is_dir():
+            raise ValueError(
+                f"Build context must be a directory: '{build_context}'"
+            )
+
+        return context_path
+
+    except Exception as e:
+        if isinstance(e, ValueError):
+            raise
+        raise ValueError(f"Invalid build context: {e}")
