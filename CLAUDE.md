@@ -1,3 +1,7 @@
+**Note**: This project uses [bd (beads)](https://github.com/steveyegge/beads)
+for issue tracking. Use `bd` commands instead of markdown TODOs.
+See AGENTS.md for workflow details.
+
 ## Gemini CLI - Offload Expensive Discovery
 
 Gemini ingests entire directories in one shot. Use it to **front-load exploration** so you can focus on targeted action.
