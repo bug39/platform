@@ -31,6 +31,38 @@ class ContainerConfig:
     read_only: bool = True
     pids_limit: int = 50
 
+    def __post_init__(self):
+        """Validate configuration values."""
+        import re
+
+        # Validate image name
+        if not self.image or not self.image.strip():
+            raise ValueError("image cannot be empty")
+
+        # Validate timeout range
+        if not (1 <= self.timeout_seconds <= 300):
+            raise ValueError(
+                f"timeout_seconds must be between 1 and 300, got {self.timeout_seconds}"
+            )
+
+        # Validate memory_limit format (e.g., "256m", "1g")
+        if not re.match(r'^\d+[kmg]$', self.memory_limit.lower()):
+            raise ValueError(
+                f"memory_limit must be in format like '256m' or '1g', got '{self.memory_limit}'"
+            )
+
+        # Validate cpu_quota range
+        if not (1000 <= self.cpu_quota <= 1_000_000):
+            raise ValueError(
+                f"cpu_quota must be between 1,000 and 1,000,000, got {self.cpu_quota}"
+            )
+
+        # Validate pids_limit range
+        if not (1 <= self.pids_limit <= 1000):
+            raise ValueError(
+                f"pids_limit must be between 1 and 1,000, got {self.pids_limit}"
+            )
+
 
 class DockerManager:
     """

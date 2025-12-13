@@ -2,11 +2,15 @@
 
 import ast
 import logging
-from typing import Optional
 from .base import Tool, ToolSchema
 from .registry import register_tool
 
 logger = logging.getLogger(__name__)
+
+# Security constants
+MAX_CODE_LENGTH = 50_000  # 50KB maximum code size
+MIN_TIMEOUT = 1  # Minimum timeout in seconds
+MAX_TIMEOUT = 300  # Maximum timeout in seconds (5 minutes)
 
 
 @register_tool
@@ -62,16 +66,30 @@ class ExecuteTool(Tool):
         Execute Python code in a sandboxed Docker container.
 
         Args:
-            code: Python code to execute
-            timeout: Execution timeout in seconds
+            code: Python code to execute (max 50KB)
+            timeout: Execution timeout in seconds (1-300)
 
         Returns:
             Formatted string with execution results
         """
+        # Validate code is not empty
         if not code or not code.strip():
             return "Error: No code provided to execute."
 
-        # Validate syntax first (fast fail)
+        # Validate code length (prevent DoS)
+        if len(code) > MAX_CODE_LENGTH:
+            logger.warning(f"Code length {len(code)} exceeds maximum {MAX_CODE_LENGTH}")
+            return f"Error: Code too long. Maximum allowed: {MAX_CODE_LENGTH:,} characters ({len(code):,} provided)."
+
+        # Validate timeout bounds (prevent resource exhaustion)
+        if not isinstance(timeout, int):
+            return f"Error: Timeout must be an integer, got {type(timeout).__name__}."
+
+        if timeout < MIN_TIMEOUT or timeout > MAX_TIMEOUT:
+            logger.warning(f"Invalid timeout {timeout}, must be between {MIN_TIMEOUT}-{MAX_TIMEOUT}")
+            return f"Error: Timeout must be between {MIN_TIMEOUT} and {MAX_TIMEOUT} seconds (got {timeout})."
+
+        # Validate syntax (fast fail)
         try:
             ast.parse(code)
         except SyntaxError as e:
