@@ -28,6 +28,10 @@ class ToolRegistry:
 
     def register(self, tool: Tool) -> None:
         """Register a tool instance."""
+        if not tool.name or not tool.name.strip():
+            raise ValueError("Tool name cannot be empty")
+        if not tool.name.replace('_', '').replace('-', '').isalnum():
+            raise ValueError(f"Tool name '{tool.name}' contains invalid characters")
         if tool.name in self._tools:
             raise ValueError(f"Tool '{tool.name}' already registered")
         self._tools[tool.name] = tool

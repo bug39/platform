@@ -19,6 +19,9 @@ class LLMConfig:
 
     def __post_init__(self):
         """Validate configuration values."""
+        valid_providers = {"anthropic", "openai"}
+        if self.provider not in valid_providers:
+            raise ValueError(f"provider must be one of {valid_providers}, got '{self.provider}'")
         if self.max_tokens < 1 or self.max_tokens > 200000:
             raise ValueError(f"max_tokens must be between 1 and 200000, got {self.max_tokens}")
         if self.temperature < 0 or self.temperature > 1:
@@ -39,6 +42,11 @@ class SandboxConfig:
             raise ValueError(f"timeout_seconds must be between 1 and 300, got {self.timeout_seconds}")
         if self.cpu_quota < 1000 or self.cpu_quota > 1000000:
             raise ValueError(f"cpu_quota must be between 1000 and 1000000, got {self.cpu_quota}")
+
+        # Validate memory_limit format (e.g., "256m", "1g")
+        import re
+        if not re.match(r'^\d+[kmg]$', self.memory_limit.lower()):
+            raise ValueError(f"memory_limit must be in format like '256m' or '1g', got '{self.memory_limit}'")
 
 
 @dataclass

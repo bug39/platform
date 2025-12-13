@@ -69,6 +69,12 @@ class Agent:
         Returns:
             The agent's final response
         """
+        # Validate input
+        if not user_input or not user_input.strip():
+            raise ValueError("User input cannot be empty")
+        if len(user_input) > 100000:  # 100KB limit
+            raise ValueError("User input too long (max 100,000 characters)")
+
         # Add user message
         self.session.add_message(Message(role="user", content=user_input))
 
@@ -90,18 +96,26 @@ class Agent:
                 "tools": tool_dicts
             })
 
-            response = self.provider.complete(
-                messages=self.session.messages,
-                system=system,
-                tools=tool_dicts if tool_dicts else None,
-            )
+            try:
+                response = self.provider.complete(
+                    messages=self.session.messages,
+                    system=system,
+                    tools=tool_dicts if tool_dicts else None,
+                )
+            except Exception as e:
+                error_msg = f"LLM provider error: {str(e)}"
+                self.events.emit(EventType.AFTER_LLM_CALL, {
+                    "error": error_msg
+                })
+                return f"I encountered an error: {error_msg}"
 
             self.events.emit(EventType.AFTER_LLM_CALL, {
                 "response": response
             })
 
             # Check if done
-            if response.stop_reason == "end_turn":
+            if response.stop_reason == "end_turn" or not response.tool_calls:
+                # Either explicitly done or no tools to call
                 self.session.add_message(Message(
                     role="assistant",
                     content=response.content

@@ -54,6 +54,13 @@ class Session:
 
     def save(self, path: Path) -> None:
         """Save session to file."""
+        # Validate path
+        path = Path(path).resolve()
+        if not path.suffix == ".json":
+            raise ValueError("Session file must have .json extension")
+        if not path.name.replace('.json', '').replace('_', '').replace('-', '').isalnum():
+            raise ValueError("Session filename contains invalid characters")
+
         data = {
             "id": self.id,
             "messages": self._raw_messages,
@@ -67,23 +74,40 @@ class Session:
     @classmethod
     def load(cls, path: Path) -> "Session":
         """Load session from file."""
+        path = Path(path).resolve()
         if not path.exists():
             raise FileNotFoundError(f"Session file not found: {path}")
+        if not path.is_file():
+            raise ValueError(f"Path is not a file: {path}")
 
-        with open(path) as f:
-            data = json.load(f)
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in session file: {e}")
+
+        # Validate structure
+        if not isinstance(data, dict):
+            raise ValueError("Session data must be a dictionary")
+        if "id" not in data or "messages" not in data:
+            raise ValueError("Session data missing required fields (id, messages)")
+        if not isinstance(data["messages"], list):
+            raise ValueError("Session messages must be a list")
 
         session = cls(id=data["id"])
         session._raw_messages = data["messages"]
         session.metadata = data.get("metadata", {})
 
-        # Reconstruct typed messages
+        # Reconstruct typed messages with validation
+        valid_roles = {"user", "assistant"}
         for raw in session._raw_messages:
             if isinstance(raw.get("content"), str):
-                session.messages.append(Message(
-                    role=raw["role"],
-                    content=raw["content"]
-                ))
+                role = raw.get("role")
+                if role in valid_roles:
+                    session.messages.append(Message(
+                        role=role,
+                        content=raw["content"]
+                    ))
 
         return session
 

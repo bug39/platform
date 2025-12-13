@@ -1,8 +1,11 @@
 """Event system for hooks and middleware."""
 
+import logging
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Any
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class EventType(Enum):
@@ -91,7 +94,7 @@ class EventBus:
                 handler(event)
             except Exception as e:
                 # Don't let handlers break the main flow
-                print(f"Warning: Event handler error for {event_type.value}: {e}")
+                logger.warning(f"Event handler error for {event_type.value}: {e}", exc_info=True)
 
     def clear(self) -> None:
         """Clear all handlers (useful for testing)."""
