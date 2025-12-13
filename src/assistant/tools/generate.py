@@ -1,12 +1,11 @@
 """Code generation tool."""
 
-import re
-import ast
 from .base import Tool, ToolSchema
 from .registry import register_tool
 from ..providers import get_provider
 from ..providers.base import Message
 from ..prompts.templates import GENERATE_CODE
+from ..utils.code import extract_code, validate_syntax
 
 
 @register_tool
@@ -54,10 +53,10 @@ class GenerateTool(Tool):
             response = provider.complete([Message(role="user", content=prompt)])
 
             # Extract and validate code
-            code = self._extract_code(response.content)
+            code = extract_code(response.content)
 
             if code:
-                if self._validate_syntax(code):
+                if validate_syntax(code):
                     return f"Generated code:\n```python\n{code}\n```"
                 else:
                     return f"Generated code has syntax errors:\n```python\n{code}\n```\nPlease review and fix."
@@ -67,27 +66,3 @@ class GenerateTool(Tool):
 
         except Exception as e:
             return f"Error generating code: {str(e)}"
-
-    def _extract_code(self, text: str) -> str:
-        """Extract code from markdown code blocks."""
-        # Try to find python code block
-        pattern = r"```python\n(.*?)```"
-        matches = re.findall(pattern, text, re.DOTALL)
-        if matches:
-            return matches[0].strip()
-
-        # Try generic code block
-        pattern = r"```\n(.*?)```"
-        matches = re.findall(pattern, text, re.DOTALL)
-        if matches:
-            return matches[0].strip()
-
-        return ""
-
-    def _validate_syntax(self, code: str) -> bool:
-        """Check if code has valid Python syntax."""
-        try:
-            ast.parse(code)
-            return True
-        except SyntaxError:
-            return False
