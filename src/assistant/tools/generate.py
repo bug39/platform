@@ -2,10 +2,14 @@
 
 from .base import Tool, ToolSchema
 from .registry import register_tool
-from ..providers import get_provider
-from ..providers.base import Message
 from ..prompts.templates import GENERATE_CODE
-from ..utils.code import extract_code, validate_syntax
+from ..utils.validation import (
+    validate_string_input,
+    call_llm,
+    extract_and_validate_code,
+    MIN_DESCRIPTION_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+)
 
 
 @register_tool
@@ -39,30 +43,38 @@ class GenerateTool(Tool):
 
     def execute(self, description: str, include_tests: bool = False) -> str:
         """Generate code based on description."""
-        # Validate input
-        if not description or len(description.strip()) < 10:
-            return "Error: Description too short. Please provide more details."
+        # Validate input using helper
+        try:
+            validate_string_input(
+                description,
+                "description",
+                max_length=MAX_DESCRIPTION_LENGTH,
+                min_length=MIN_DESCRIPTION_LENGTH
+            )
+        except ValueError as e:
+            return f"Error: {str(e)}"
 
+        # Build prompt
         prompt = GENERATE_CODE.format(
             description=description,
             with_tests="Include pytest test cases." if include_tests else ""
         )
 
         try:
-            provider = get_provider()
-            response = provider.complete([Message(role="user", content=prompt)])
+            # Call LLM using helper
+            response_content = call_llm(prompt)
 
-            # Extract and validate code
-            code = extract_code(response.content)
+            # Extract and validate code using helper
+            code, is_valid = extract_and_validate_code(response_content)
 
             if code:
-                if validate_syntax(code):
+                if is_valid:
                     return f"Generated code:\n```python\n{code}\n```"
                 else:
                     return f"Generated code has syntax errors:\n```python\n{code}\n```\nPlease review and fix."
             else:
                 # No code block found, return raw response
-                return f"Generated response:\n{response.content}"
+                return f"Generated response:\n{response_content}"
 
         except Exception as e:
             return f"Error generating code: {str(e)}"

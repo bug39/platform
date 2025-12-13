@@ -6,6 +6,7 @@ from typing import List
 
 from .base import Tool, ToolSchema
 from .registry import register_tool
+from ..utils.validation import validate_string_input, MAX_CODE_LENGTH
 
 
 @dataclass
@@ -44,8 +45,11 @@ class AnalyzeTool(Tool):
 
     def execute(self, code: str) -> str:
         """Analyze code and return structured results."""
-        if not code or not code.strip():
-            return "Error: No code provided for analysis."
+        # Validate input using helper
+        try:
+            validate_string_input(code, "code", max_length=MAX_CODE_LENGTH)
+        except ValueError as e:
+            return f"Error: {str(e)}"
 
         result = self._analyze(code)
 
