@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+# Security: Create non-root user
+RUN useradd -m -s /bin/bash sandbox
+
+# Install common packages for data science and testing
+RUN pip install --no-cache-dir \
+    pytest==7.4.4 \
+    numpy==1.26.3 \
+    pandas==2.1.4 \
+    requests==2.31.0
+
+# Set up workspace
+WORKDIR /sandbox
+RUN chown sandbox:sandbox /sandbox
+
+# Switch to non-root user
+USER sandbox
+
+# Default command
+CMD ["python", "--version"]

@@ -67,14 +67,16 @@ def test_analyze_tool_empty_input():
 
 
 def test_execute_tool_stub():
-    """Test execute tool stub."""
+    """Test execute tool with actual execution."""
     tool = ExecuteTool()
 
     code = "print('hello')"
 
     result = tool.execute(code=code)
 
-    assert "Phase 3" in result or "validation successful" in result.lower()
+    # Should now execute successfully and return output
+    assert "successful" in result.lower()
+    assert "hello" in result
 
 
 def test_execute_tool_syntax_error():

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional
 
 
 @dataclass
@@ -63,24 +63,3 @@ class Runtime(ABC):
     def is_available(self) -> bool:
         """Check if this runtime is available."""
         return True
-
-
-# Runtime registry
-_runtimes: Dict[str, Runtime] = {}
-
-
-def register_runtime(runtime: Runtime) -> None:
-    """Register a runtime."""
-    _runtimes[runtime.language] = runtime
-
-
-def get_runtime(language: str) -> Runtime:
-    """Get a runtime by language."""
-    if language not in _runtimes:
-        raise ValueError(f"Unknown runtime: {language}. Available: {list(_runtimes.keys())}")
-    return _runtimes[language]
-
-
-def list_runtimes() -> list:
-    """List available runtimes."""
-    return list(_runtimes.keys())
