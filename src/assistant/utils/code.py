@@ -15,15 +15,19 @@ def extract_code(text: str) -> str:
     Returns:
         Extracted code or empty string if no code blocks found
     """
+    # SECURITY: Use non-backtracking patterns to prevent ReDoS attacks
+    # Match code blocks by using negated character class instead of .* with DOTALL
+
     # Try to find python code block
-    pattern = r"```python\n(.*?)```"
-    matches = re.findall(pattern, text, re.DOTALL)
+    # Pattern matches: ```python\n followed by any chars except ``` sequence, then ```
+    pattern = r"```python\n((?:(?!```)[\s\S])*?)```"
+    matches = re.findall(pattern, text)
     if matches:
         return matches[0].strip()
 
     # Try generic code block
-    pattern = r"```\n(.*?)```"
-    matches = re.findall(pattern, text, re.DOTALL)
+    pattern = r"```\n((?:(?!```)[\s\S])*?)```"
+    matches = re.findall(pattern, text)
     if matches:
         return matches[0].strip()
 

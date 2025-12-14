@@ -222,8 +222,9 @@ class DockerManager:
                 stats = container.stats(stream=False)
                 if 'memory_stats' in stats and 'usage' in stats['memory_stats']:
                     memory_used_mb = stats['memory_stats']['usage'] / (1024 * 1024)
-            except:
-                pass  # Memory stats not critical
+            except Exception:
+                # Memory stats not critical - catch normal exceptions but allow system exits
+                pass
 
             return ExecutionResult(
                 success=(result["StatusCode"] == 0),
@@ -359,7 +360,8 @@ class DockerManager:
         try:
             self.client.ping()
             return True
-        except:
+        except Exception:
+            # Catch normal exceptions but allow KeyboardInterrupt/SystemExit
             return False
 
     def get_stats(self) -> Dict[str, any]:
