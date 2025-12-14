@@ -99,14 +99,25 @@ class Session:
         session.metadata = data.get("metadata", {})
 
         # Reconstruct typed messages with validation
-        valid_roles = {"user", "assistant"}
+        # BUG FIX: Handle both string and complex content (tool results)
+        valid_roles = {"user", "assistant", "tool"}
         for raw in session._raw_messages:
-            if isinstance(raw.get("content"), str):
-                role = raw.get("role")
-                if role in valid_roles:
+            role = raw.get("role")
+            content = raw.get("content")
+
+            if role in valid_roles and content is not None:
+                # Handle string content (simple messages)
+                if isinstance(content, str):
                     session.messages.append(Message(
                         role=role,
-                        content=raw["content"]
+                        content=content
+                    ))
+                # Handle complex content (tool calls/results with content blocks)
+                elif isinstance(content, (list, dict)):
+                    # Keep complex content as-is for tool messages
+                    session.messages.append(Message(
+                        role=role,
+                        content=content
                     ))
 
         return session

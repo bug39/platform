@@ -67,6 +67,21 @@ class EventBus:
             cls._instance = cls()
         return cls._instance
 
+    @classmethod
+    def reset(cls) -> None:
+        """
+        Reset the singleton instance (clears all handlers).
+
+        MEMORY LEAK FIX: Call this when you want to clean up all event handlers,
+        such as when shutting down an agent or in tests.
+
+        Example:
+            EventBus.reset()  # Clears singleton and all handlers
+        """
+        if cls._instance is not None:
+            cls._instance.clear()
+        cls._instance = None
+
     def subscribe(self, event_type: EventType, handler: EventHandler) -> None:
         """Subscribe to an event type."""
         if event_type not in self._handlers:
@@ -97,8 +112,14 @@ class EventBus:
                 logger.warning(f"Event handler error for {event_type.value}: {e}", exc_info=True)
 
     def clear(self) -> None:
-        """Clear all handlers (useful for testing)."""
+        """
+        Clear all handlers.
+
+        MEMORY LEAK FIX: Call this to prevent handler accumulation.
+        Useful for testing and cleanup when disposing of agent instances.
+        """
         self._handlers = {}
+        logger.debug("Cleared all event handlers")
 
     def get_handler_count(self, event_type: EventType) -> int:
         """Get number of handlers for an event type."""
