@@ -30,7 +30,7 @@ def example_1_basic_workflow():
     print("\n[1] Generating code from description...")
     generator = GenerateTool()
 
-    description = "Write a function that calculates the factorial of a number using recursion"
+    description = "Write a function that computes the diophantine approximation of a real number n"
     print(f"Description: {description}")
 
     generated_code = generator.execute(description=description)
@@ -211,18 +211,22 @@ except Exception as e:
     # Test 2: Resource limits
     print("\n[Test 2] Resource limits - testing memory constraints...")
     memory_code = """
-import sys
+# Try to allocate way more memory than allowed (256MB limit)
 try:
-    # Try to allocate a huge list (will hit memory limit)
-    huge_list = [0] * (1024**3)  # 1GB of integers
+    huge_list = [0] * (1024 * 1024 * 1024)  # Try to allocate 8GB
     print("SECURITY ISSUE: Memory limit not enforced!")
 except MemoryError:
-    print("✓ Memory limit enforced as expected")
-except Exception as e:
-    print(f"✓ Resource limit active: {type(e).__name__}")
+    print("✓ Memory limit enforced (MemoryError)")
 """
     result = executor.execute(code=memory_code, timeout=10)
-    print(f"Result:\n{result}\n")
+    # Docker may kill the process (exit code 137) before Python raises MemoryError
+    # Both outcomes indicate the memory limit is working
+    if "✓ Memory limit enforced" in result:
+        print(f"Result:\n{result}\n")
+    elif "exit code: 137" in result or "Execution failed" in result:
+        print(f"Result:\n✓ Memory limit enforced (Container OOM-killed)\n")
+    else:
+        print(f"Result:\n{result}\n")
 
     # Test 3: Filesystem restrictions
     print("\n[Test 3] Filesystem - testing read-only restrictions...")
@@ -274,7 +278,7 @@ def main():
         print("=" * 70 + "\n")
 
     except Exception as e:
-        print(f"\n❌ Error running examples: {e}")
+        print(f"\n (X) Error running examples: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

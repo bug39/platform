@@ -11,6 +11,9 @@ Requirements:
 - Follow Python best practices
 - Include type hints where appropriate
 - Wrap code in ```python``` code blocks
+- Generate ONLY ONE implementation (the most optimal and efficient approach)
+- Do NOT provide multiple alternative implementations (e.g., both recursive and iterative)
+- If tests are requested, ensure ALL test cases call the same implementation
 
 Provide only the code, no additional explanation."""
 
