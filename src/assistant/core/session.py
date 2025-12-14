@@ -26,6 +26,7 @@ class Session:
     _raw_messages: List[dict] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
     max_messages: Optional[int] = None  # Override config default if set
+    prune_strategy: Optional[str] = None  # Override config default if set
 
     def _prune_if_needed(self) -> None:
         """Prune messages if limit is exceeded."""
@@ -35,7 +36,7 @@ class Session:
         if len(self._raw_messages) <= max_msgs:
             return  # No pruning needed
 
-        strategy = config.session.prune_strategy
+        strategy = self.prune_strategy if self.prune_strategy is not None else config.session.prune_strategy
 
         if strategy == "keep_last":
             # Keep only the most recent messages

@@ -71,6 +71,7 @@ class SandboxConfig:
     memory_limit: str = "256m"
     cpu_quota: int = 50000
     network_enabled: bool = False
+    seccomp_profile_path: str = "docker/seccomp-profile.json"
 
     def __post_init__(self):
         """Validate configuration values."""
@@ -83,6 +84,9 @@ class SandboxConfig:
         import re
         if not re.match(r'^\d+[kmg]$', self.memory_limit.lower()):
             raise ValueError(f"memory_limit must be in format like '256m' or '1g', got '{self.memory_limit}'")
+
+        if not isinstance(self.seccomp_profile_path, str):
+            raise ValueError(f"seccomp_profile_path must be a string, got {type(self.seccomp_profile_path)}")
 
 
 @dataclass

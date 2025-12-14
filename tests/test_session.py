@@ -266,7 +266,7 @@ class TestSessionPruning:
 
     def test_keep_last_strategy_prunes_old_messages(self):
         """keep_last strategy should remove oldest messages."""
-        session = Session(max_messages=5)
+        session = Session(max_messages=5, prune_strategy="keep_last")
         
         # Add 10 messages
         for i in range(10):

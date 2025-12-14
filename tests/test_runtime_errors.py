@@ -1,6 +1,7 @@
 """Runtime error handling tests."""
 
 import pytest
+from src.assistant.config import SandboxConfig
 from src.assistant.runtimes.python import PythonRuntime
 from src.assistant.runtimes.docker import DockerManager, DOCKER_AVAILABLE
 
@@ -16,7 +17,7 @@ class TestRuntimeErrorHandling:
     def setup(self):
         """Set up runtime for each test."""
         try:
-            manager = DockerManager()
+            manager = DockerManager(SandboxConfig())
             if not manager.is_available():
                 pytest.skip("Docker daemon not running")
         except Exception:

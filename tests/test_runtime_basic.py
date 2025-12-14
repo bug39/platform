@@ -1,6 +1,7 @@
 """Basic runtime functionality tests."""
 
 import pytest
+from src.assistant.config import SandboxConfig
 from src.assistant.runtimes.python import PythonRuntime
 from src.assistant.runtimes.docker import DockerManager, DOCKER_AVAILABLE
 
@@ -17,7 +18,7 @@ class TestPythonRuntimeBasic:
         """Set up runtime for each test."""
         try:
             # Check if Docker is actually running
-            manager = DockerManager()
+            manager = DockerManager(SandboxConfig())
             if not manager.is_available():
                 pytest.skip("Docker daemon not running")
         except Exception:

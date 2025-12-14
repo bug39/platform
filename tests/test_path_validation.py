@@ -179,8 +179,9 @@ class TestDockerManagerPathValidation:
     def test_invalid_image_name_returns_false(self):
         """Test that invalid image name causes ensure_image to return False."""
         from src.assistant.runtimes.docker import DockerManager
+        from src.assistant.config import SandboxConfig
 
-        manager = DockerManager()
+        manager = DockerManager(SandboxConfig())
 
         # Invalid image name should return False
         result = manager.ensure_image("bad@image")
@@ -189,8 +190,9 @@ class TestDockerManagerPathValidation:
     def test_path_traversal_in_dockerfile_returns_false(self):
         """Test that path traversal in dockerfile causes ensure_image to return False."""
         from src.assistant.runtimes.docker import DockerManager
+        from src.assistant.config import SandboxConfig
 
-        manager = DockerManager()
+        manager = DockerManager(SandboxConfig())
 
         # Path traversal should return False
         result = manager.ensure_image(
@@ -203,8 +205,9 @@ class TestDockerManagerPathValidation:
     def test_nonexistent_build_context_returns_false(self):
         """Test that nonexistent build context causes ensure_image to return False."""
         from src.assistant.runtimes.docker import DockerManager
+        from src.assistant.config import SandboxConfig
 
-        manager = DockerManager()
+        manager = DockerManager(SandboxConfig())
 
         # Nonexistent context should return False
         result = manager.ensure_image(
