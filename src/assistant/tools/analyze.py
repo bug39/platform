@@ -106,9 +106,11 @@ class AnalyzeTool(Tool):
                 complexity += 1
 
             # Check for potential issues
-            elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Str):
-                # Standalone strings might be commented-out code
-                pass
+            # FIX: Use ast.Constant instead of deprecated ast.Str (Python 3.8+)
+            elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                if isinstance(node.value.value, str):
+                    # Standalone strings might be commented-out code
+                    pass
 
         # Check for complexity issues
         if complexity > 20:

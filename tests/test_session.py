@@ -249,3 +249,40 @@ class TestSessionSerialization:
             assert loaded.id == session.id
             assert len(loaded.messages) == len(session.messages)
             assert loaded.metadata == session.metadata
+
+
+class TestSessionPruning:
+    """Test session message pruning functionality."""
+
+    def test_pruning_not_triggered_under_limit(self):
+        """Messages under limit should not be pruned."""
+        session = Session(max_messages=10)
+        
+        for i in range(5):
+            session.add_message(Message(role="user", content=f"Message {i}"))
+        
+        assert len(session.messages) == 5
+        assert len(session._raw_messages) == 5
+
+    def test_keep_last_strategy_prunes_old_messages(self):
+        """keep_last strategy should remove oldest messages."""
+        session = Session(max_messages=5)
+        
+        # Add 10 messages
+        for i in range(10):
+            session.add_message(Message(role="user", content=f"Message {i}"))
+        
+        # Should only keep last 5
+        assert len(session.messages) == 5
+        assert session.messages[0].content == "Message 5"
+        assert session.messages[-1].content == "Message 9"
+
+    def test_max_messages_override_works(self):
+        """Custom max_messages should override config default."""
+        session = Session(max_messages=3)
+        
+        for i in range(10):
+            session.add_message(Message(role="user", content=f"Message {i}"))
+        
+        # Should respect custom limit of 3
+        assert len(session.messages) == 3

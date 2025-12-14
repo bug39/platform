@@ -48,19 +48,29 @@ class PythonRuntime(DockerRuntime):
             >>> test = "def test_add(): assert add(1, 2) == 3"
             >>> result = runtime.run_tests(code, test)
         """
-        # Create a pytest wrapper that writes code to a temporary module
-        # and runs pytest on it
-        wrapper = f'''
+        # SECURITY FIX: Use json to safely pass code without string interpolation
+        # This prevents code injection via triple-quote escaping
+        import json
+
+        # Combine code and tests
+        combined_code = f"{code}\n\n{test_code}"
+
+        # Create a wrapper that reads code from stdin (passed as JSON)
+        # This avoids any string escaping issues
+        wrapper = '''
 import sys
 import tempfile
 import os
+import json
+
+# Read code from environment (safer than string interpolation)
+code_data = json.loads(sys.stdin.read())
+test_code = code_data["code"]
 
 # Create temporary test file
 with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
     test_file = f.name
-    f.write("""{code}
-
-{test_code}""")
+    f.write(test_code)
 
 try:
     # Run pytest
@@ -72,4 +82,38 @@ finally:
     if os.path.exists(test_file):
         os.remove(test_file)
 '''
-        return self.run(wrapper)
+
+        # Instead of embedding in string, pass via stdin-like mechanism
+        # Docker run_container passes code_input as command argument
+        # We need to modify the wrapper to accept code via a different method
+        # For now, use base64 encoding to safely embed without triple-quote issues
+        import base64
+
+        encoded_code = base64.b64encode(combined_code.encode('utf-8')).decode('ascii')
+
+        safe_wrapper = f'''
+import sys
+import tempfile
+import os
+import base64
+
+# Decode code from base64 (prevents injection via quote escaping)
+encoded = "{encoded_code}"
+test_code = base64.b64decode(encoded).decode('utf-8')
+
+# Create temporary test file
+with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    test_file = f.name
+    f.write(test_code)
+
+try:
+    # Run pytest
+    import pytest
+    exit_code = pytest.main([test_file, '-v', '--tb=short'])
+    sys.exit(exit_code)
+finally:
+    # Cleanup
+    if os.path.exists(test_file):
+        os.remove(test_file)
+'''
+        return self.run(safe_wrapper)

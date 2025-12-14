@@ -116,6 +116,8 @@ class Agent:
             # Check if done
             if response.stop_reason == "end_turn" or not response.tool_calls:
                 # Either explicitly done or no tools to call
+                # TYPE SAFETY: response.content is str from Response dataclass
+                # Message.content now supports Union[str, list, dict], so this is safe
                 self.session.add_message(Message(
                     role="assistant",
                     content=response.content
@@ -124,14 +126,26 @@ class Agent:
                     "iterations": iteration + 1,
                     "response": response.content
                 })
-                return response.content
+                # Ensure we return a string for final response
+                if isinstance(response.content, str):
+                    return response.content
+                else:
+                    # If content is not string (shouldn't happen for final response), convert
+                    return str(response.content)
 
             # Handle tool calls
             if response.tool_calls:
                 # Add assistant message with tool calls (for context)
+                # TYPE SAFETY: Check if raw response has content attribute
+                if hasattr(response.raw, 'content'):
+                    content = response.raw.content
+                else:
+                    # Fallback to response content if raw doesn't have it
+                    content = response.content
+
                 self.session.add_raw({
                     "role": "assistant",
-                    "content": response.raw.content  # Keep original format
+                    "content": content  # Keep original format
                 })
 
                 tool_results = []

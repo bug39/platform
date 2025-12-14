@@ -7,15 +7,16 @@ from typing import List, Any, Optional
 from dataclasses import dataclass, field
 
 from ..providers.base import Message
+from ..config import get_config
 
 
 @dataclass
 class Session:
     """
-    Manages conversation state.
+    Manages conversation state with configurable message limits.
 
     Supports:
-    - Message history
+    - Message history with automatic pruning
     - Serialization/deserialization
     - Context length management
     """
@@ -24,17 +25,59 @@ class Session:
     messages: List[Message] = field(default_factory=list)
     _raw_messages: List[dict] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
+    max_messages: Optional[int] = None  # Override config default if set
+
+    def _prune_if_needed(self) -> None:
+        """Prune messages if limit is exceeded."""
+        config = get_config()
+        max_msgs = self.max_messages if self.max_messages is not None else config.session.max_messages
+
+        if len(self._raw_messages) <= max_msgs:
+            return  # No pruning needed
+
+        strategy = config.session.prune_strategy
+
+        if strategy == "keep_last":
+            # Keep only the most recent messages
+            to_remove = len(self._raw_messages) - max_msgs
+            self._raw_messages = self._raw_messages[to_remove:]
+            self.messages = self.messages[to_remove:]
+
+        elif strategy == "keep_first_and_last":
+            # Keep first few and last few messages
+            # This preserves conversation context (beginning + recent)
+            to_remove = len(self._raw_messages) - max_msgs
+            if to_remove > 0:
+                # Keep first 20% and last 80%
+                keep_first = max(2, max_msgs // 5)
+                keep_last = max_msgs - keep_first
+
+                self._raw_messages = (
+                    self._raw_messages[:keep_first] +
+                    self._raw_messages[-keep_last:]
+                )
+                self.messages = (
+                    self.messages[:keep_first] +
+                    self.messages[-keep_last:]
+                )
+
+        elif strategy == "fifo":
+            # First-in-first-out: same as keep_last
+            to_remove = len(self._raw_messages) - max_msgs
+            self._raw_messages = self._raw_messages[to_remove:]
+            self.messages = self.messages[to_remove:]
 
     def add_message(self, message: Message) -> None:
-        """Add a typed message."""
+        """Add a typed message and prune if limit exceeded."""
         self.messages.append(message)
         self._raw_messages.append({
             "role": message.role,
             "content": message.content
         })
+        self._prune_if_needed()
 
     def add_raw(self, raw: dict) -> None:
-        """Add a raw message dict (for tool calls)."""
+        """Add a raw message dict (for tool calls) and prune if needed."""
         self._raw_messages.append(raw)
         # Also add to typed messages if simple
         if isinstance(raw.get("content"), str):
@@ -42,6 +85,7 @@ class Session:
                 role=raw["role"],
                 content=raw["content"]
             ))
+        self._prune_if_needed()
 
     def get_messages_for_api(self) -> List[dict]:
         """Get messages in API format."""

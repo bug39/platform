@@ -2,13 +2,13 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Union
 
 
 @dataclass
 class Message:
-    role: str  # "user" | "assistant"
-    content: str
+    role: str  # "user" | "assistant" | "tool"
+    content: Union[str, list, dict]  # String for simple messages, list/dict for tool results
 
 
 @dataclass
