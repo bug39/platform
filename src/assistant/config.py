@@ -63,6 +63,33 @@ class Config:
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
 
+    def __repr__(self) -> str:
+        """
+        Secure repr that masks API keys.
+
+        Returns:
+            String representation with masked sensitive data
+        """
+        def mask_key(key: Optional[str]) -> str:
+            """Mask API key, showing only last 4 characters."""
+            if not key:
+                return "None"
+            if len(key) <= 4:
+                return "***"
+            return f"***{key[-4:]}"
+
+        return (
+            f"Config("
+            f"llm={self.llm!r}, "
+            f"sandbox={self.sandbox!r}, "
+            f"anthropic_api_key={mask_key(self.anthropic_api_key)}, "
+            f"openai_api_key={mask_key(self.openai_api_key)})"
+        )
+
+    def __str__(self) -> str:
+        """Secure string representation (delegates to __repr__)."""
+        return self.__repr__()
+
     @classmethod
     def load(cls, config_path: Optional[Path] = None) -> "Config":
         """Load config from file, with env var overrides."""

@@ -231,7 +231,7 @@ def validate_dockerfile_path(dockerfile_path: str, build_context: str = ".") -> 
     if not dockerfile_path or not dockerfile_path.strip():
         raise ValueError("Dockerfile path cannot be empty")
 
-    # Check for path traversal attempts
+    # Check for path traversal attempts (basic check)
     if ".." in dockerfile_path:
         raise ValueError(
             f"Invalid Dockerfile path: '{dockerfile_path}'. "
@@ -247,18 +247,41 @@ def validate_dockerfile_path(dockerfile_path: str, build_context: str = ".") -> 
 
     # Resolve the full path and ensure it's within build context
     try:
-        context_path = Path(build_context).resolve()
-        full_path = (context_path / dockerfile_path).resolve()
+        context_path = Path(build_context).resolve(strict=False)
+        full_path = (context_path / dockerfile_path).resolve(strict=False)
 
-        # Ensure the resolved path is within the build context
-        if not str(full_path).startswith(str(context_path)):
-            raise ValueError(
-                f"Invalid Dockerfile path: '{dockerfile_path}'. "
-                "Path must be within build context"
-            )
+        # SECURITY: Use is_relative_to() instead of string comparison to prevent bypasses
+        # This properly handles symlinks, .. sequences, and other edge cases
+        try:
+            # Python 3.9+ has is_relative_to()
+            if not full_path.is_relative_to(context_path):
+                raise ValueError(
+                    f"Invalid Dockerfile path: '{dockerfile_path}'. "
+                    "Path must be within build context"
+                )
+        except AttributeError:
+            # Fallback for Python < 3.9: use os.path.commonpath
+            # This is more secure than string comparison
+            import os
+            try:
+                common = Path(os.path.commonpath([str(context_path), str(full_path)]))
+                if common != context_path:
+                    raise ValueError(
+                        f"Invalid Dockerfile path: '{dockerfile_path}'. "
+                        "Path must be within build context"
+                    )
+            except ValueError:
+                # commonpath raises ValueError if paths are on different drives
+                raise ValueError(
+                    f"Invalid Dockerfile path: '{dockerfile_path}'. "
+                    "Path must be within build context"
+                )
 
         return full_path
 
+    except ValueError:
+        # Re-raise ValueError (from our validation)
+        raise
     except Exception as e:
         raise ValueError(f"Invalid Dockerfile path: {e}")
 
