@@ -3,7 +3,6 @@
 import time
 import logging
 import os
-import json
 from typing import Optional, Dict, List
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +15,6 @@ except ImportError:
     DOCKER_AVAILABLE = False
 
 from .base import ExecutionResult, Runtime, RuntimeConfig
-from ..config import SandboxConfig, get_config
 from ..utils.validation import (
     validate_docker_image_name,
     validate_dockerfile_path,
@@ -81,17 +79,16 @@ class DockerManager:
     - Automatic cleanup of stopped containers
     """
 
-    def __init__(self, sandbox_config: SandboxConfig):
+    def __init__(self, seccomp_profile: Optional[str] = None):
         """
         Initialize Docker manager.
 
         Args:
-            sandbox_config: Sandbox configuration object.
+            seccomp_profile: Path to seccomp profile JSON (default: docker/seccomp-profile.json)
         """
         if not DOCKER_AVAILABLE:
             raise ImportError("docker package not installed. Run: pip install docker")
 
-        self._sandbox_config = sandbox_config
         try:
             self.client = docker.from_env()
             # Test connection
@@ -100,7 +97,17 @@ class DockerManager:
             raise RuntimeError(f"Failed to connect to Docker daemon: {e}")
 
         self._image_cache: Dict[str, bool] = {}
-        self._seccomp_profile_data: Optional[Dict] = self._load_and_validate_seccomp_profile()
+
+        # Set up seccomp profile for syscall filtering
+        if seccomp_profile is None:
+            # Default to the included seccomp profile
+            profile_path = Path(__file__).parent.parent.parent / "docker" / "seccomp-profile.json"
+            self.seccomp_profile = str(profile_path) if profile_path.exists() else None
+        else:
+            self.seccomp_profile = seccomp_profile
+
+        if self.seccomp_profile:
+            logger.info(f"Using seccomp profile: {self.seccomp_profile}")
 
     def ensure_image(self, image_name: str, dockerfile_path: Optional[str] = None,
                     build_context: str = ".", force_rebuild: bool = False) -> bool:
@@ -163,63 +170,6 @@ class DockerManager:
                 logger.error(f"Failed to build image {image_name}: {e}")
                 return False
 
-    def _load_and_validate_seccomp_profile(self) -> Optional[Dict]:
-        """Load and validate seccomp profile from path in config."""
-        profile_path_str = self._sandbox_config.seccomp_profile_path
-        if not profile_path_str:
-            logger.warning("Seccomp profile path is not configured; running without seccomp.")
-            return None
-
-        profile_path = Path(profile_path_str).resolve()
-
-        if not profile_path.exists():
-            raise FileNotFoundError(f"Seccomp profile not found at {profile_path}")
-        if not profile_path.is_file():
-            raise ValueError(f"Seccomp profile path {profile_path} is not a file.")
-
-        try:
-            with open(profile_path, "r") as f:
-                profile_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in seccomp profile {profile_path}: {e}")
-        except IOError as e:
-            raise IOError(f"Could not read seccomp profile {profile_path}: {e}")
-
-        # Detailed validation of the profile structure
-        if not isinstance(profile_data, dict):
-            raise ValueError("Seccomp profile must be a JSON object.")
-
-        # Validate defaultAction
-        valid_actions = {"SCMP_ACT_KILL", "SCMP_ACT_ERRNO", "SCMP_ACT_ALLOW"}
-        if "defaultAction" not in profile_data:
-            raise ValueError("Seccomp profile must have a 'defaultAction' key.")
-        if profile_data["defaultAction"] not in valid_actions:
-            raise ValueError(f"Invalid defaultAction: {profile_data['defaultAction']}")
-
-        # Validate architectures
-        if "architectures" in profile_data:
-            if not isinstance(profile_data["architectures"], list):
-                raise ValueError("'architectures' must be a list.")
-            if not all(isinstance(arch, str) for arch in profile_data["architectures"]):
-                raise ValueError("All items in 'architectures' must be strings.")
-
-        # Validate syscalls
-        if "syscalls" in profile_data:
-            if not isinstance(profile_data["syscalls"], list):
-                raise ValueError("'syscalls' must be a list.")
-            for i, syscall in enumerate(profile_data["syscalls"]):
-                if not isinstance(syscall, dict):
-                    raise ValueError(f"Syscall at index {i} must be an object.")
-                if "names" not in syscall or "action" not in syscall:
-                    raise ValueError(f"Syscall at index {i} must have 'names' and 'action'.")
-                if not isinstance(syscall["names"], list) or not all(isinstance(name, str) for name in syscall["names"]):
-                    raise ValueError(f"Syscall 'names' at index {i} must be a list of strings.")
-                if syscall["action"] not in valid_actions:
-                    raise ValueError(f"Invalid action in syscall at index {i}: {syscall['action']}")
-
-        logger.info(f"Successfully loaded and validated seccomp profile from: {profile_path}")
-        return profile_data
-
     def run_container(self, config: ContainerConfig, code_input: str) -> ExecutionResult:
         """
         Run code in a sandboxed Docker container.
@@ -239,8 +189,8 @@ class DockerManager:
             security_opts = ["no-new-privileges"]  # Prevent privilege escalation
 
             # Add seccomp profile for syscall filtering
-            if self._seccomp_profile_data:
-                security_opts.append(f"seccomp={json.dumps(self._seccomp_profile_data)}")
+            if self.seccomp_profile and os.path.exists(self.seccomp_profile):
+                security_opts.append(f"seccomp={self.seccomp_profile}")
 
             # Create and run container with security hardening
             container = self.client.containers.run(
@@ -452,11 +402,7 @@ class DockerRuntime(Runtime):
             manager: Optional DockerManager instance (creates new if None)
         """
         self._config = config
-        if manager:
-            self._manager = manager
-        else:
-            sandbox_config = get_config().sandbox
-            self._manager = DockerManager(sandbox_config=sandbox_config)
+        self._manager = manager or DockerManager()
 
         # Ensure the Docker image exists
         dockerfile_path = f"Dockerfile.{config.language}"
