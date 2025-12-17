@@ -182,8 +182,6 @@ Code execution happens in a **sandboxed Docker container** with:
 
 MIT
 
-## Contributing
-
 Issues and pull requests welcome! See beads tracker for current work:
 
 ```bash
